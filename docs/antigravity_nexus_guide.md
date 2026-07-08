@@ -1,102 +1,100 @@
-# Antigravity 2.0: Nexus Workflow & Integration Guide
+# Antigravity 2.0：Nexus 工作流与集成指南
 
-This guide explains how the files in `ai-workspace-nexus` cooperate, how they hook natively into the **Antigravity 2.0** runtime engine, and how you can run your daily development workflow with this setup.
+本指南详细阐述了 `ai-workspace-nexus` 插件包中各个文件是如何协同工作的，它们是如何与 **Antigravity 2.0** 运行时引擎原生集成的，以及如何在日常开发中落地这一套高效、规范的人机协作工作流。
 
 ---
 
-## 🏛️ System Architecture: How the Files Cooperate
+## 🏛️ 系统架构：文件如何协同运转
 
-The Antigravity 2.0 plugin architecture uses a declarative and event-driven design. The diagram below illustrates how a session lifecycle triggers different layers of the plugin:
+Antigravity 2.0 插件架构采用声明式与事件驱动的设计理念。下图直观地展示了在一次开发会话生命周期中，插件各组件是如何被依次触发的：
 
 ```mermaid
 sequenceDiagram
     autonumber
-    actor User as Human Partner
-    participant Runner as Antigravity 2.0 Engine
-    participant Hooks as hooks.json / hooks/
-    participant Skills as skills/ (Markdown Rules)
-    participant Subagents as agents/ (System Prompts)
+    actor User as 开发者 (Human Partner)
+    participant Runner as Antigravity 2.0 引擎
+    participant Hooks as hooks.json / hooks/ 钩子
+    participant Skills as skills/ (Markdown 规范)
+    participant Subagents as agents/ (子智能体提示词)
 
-    User->>Runner: "Implement auth system" (Task Start)
-    Runner->>Skills: Match keywords -> Load brainstorming.md
-    Skills-->>Runner: Inject rules (Design Spec Gate)
-    Note over Runner: AI designs Spec & User Approves
-    Runner->>Runner: Create task_plan.md & attest-plan (SHA-256)
+    User->>Runner: "实现用户认证队列系统" (任务开始)
+    Runner->>Skills: 匹配关键词 -> 载入 brainstorming.md
+    Skills-->>Runner: 注入设计门禁规则 (Design Spec Gate)
+    Note over Runner: AI 产出设计规约，用户明确批准
+    Runner->>Runner: 自动创建 task_plan.md 并运行 hash 锁定 (attest-plan)
     
     rect rgb(230, 245, 255)
-        Note over Runner: Main Iteration Loop
-        Runner->>Hooks: PreToolUse (Before writing files)
-        Hooks->>Hooks: inject-plan (Verify Plan SHA & Inject Context)
-        Hooks-->>Runner: Context injected securely
-        Runner->>Subagents: Dispatch subagent (SDD Loop)
-        Subagents-->>Runner: Return subagent diff & progress ledger
+        Note over Runner: 开发迭代微循环
+        Runner->>Hooks: PreToolUse 事件 (调用文件/终端命令前)
+        Hooks->>Hooks: 运行 inject-plan (校验 Plan 哈希值并注入上下文)
+        Hooks-->>Runner: 注入安全分界线及当前任务状态
+        Runner->>Subagents: 派发子智能体 (SDD 并发开发)
+        Subagents-->>Runner: 返回代码修改 diff 和流水账 ledger
     end
 
-    Runner->>Hooks: Stop Event (AI finishes work)
-    Hooks->>Hooks: check-gate (Checks task_plan.md completion status)
-    alt Tasks Incomplete
-        Hooks-->>Runner: Hard Block (Exit Code 2: Resume task)
-        Runner->>User: "I must continue executing..."
-    else All Tasks Completed
-        Hooks-->>Runner: Exit Code 0 (Allow termination)
-        Runner->>User: Launch git-integration delivery menu
+    Runner->>Hooks: Stop 事件 (AI 尝试结束/退出会话)
+    Hooks->>Hooks: 运行 check-gate (自动审计 task_plan.md 状态)
+    alt 任务未全部完成
+        Hooks-->>Runner: 阻断退出 (Exit Code 2: 强制继续执行)
+        Runner->>User: "我检测到任务尚未完全实现，我必须继续开发..."
+    else 所有任务标记为已完成
+        Hooks-->>Runner: 允许退出 (Exit Code 0: 放行)
+        Runner->>User: 弹出 git-integration 4选项交付菜单
     end
 ```
 
-### 1. The Configurations (Root Level)
-* **`plugin.json`**: Tells the Antigravity Plugin Manager that this directory is an active plugin, declaring its name, version, and capabilities.
-* **`mcp_config.json`**: Automatically registers standard Model Context Protocol (MCP) servers (Brave search, Local Filesystem, etc.) at startup, equipping the AI with secure tools.
-* **`hooks.json`**: Binds scripts inside `hooks/` to the runtime event loops (`PreToolUse`, `Stop`, `PreInvocation`).
+### 1. 根目录配置文件 (Configuration Layer)
+* **`plugin.json`**：插件清单文件。向 Antigravity 声明此目录是一个可激活的本地/全局插件，定义其基本元数据。
+* **`mcp_config.json`**：注册本地运行的 MCP 服务（如本地文件系统、Brave 搜索服务等），在会话启动时自动加载，赋予 AI 丰富的辅助工具。
+* **`hooks.json`**：事件路由表。将 Antigravity 的生命周期事件（如 `PreToolUse`、`Stop`、`PreInvocation`）无缝绑定到 `hooks/` 目录下的自动化校验脚本。
 
-### 2. The Lifecycles (Hooks)
-* **`hooks/inject-plan`**: Fired on `PreToolUse` (before every tool execution) and `PreInvocation`. It reads `task_plan.md` and `progress.md` on disk, calculates the SHA-256 hash of the plan, compares it to the attestation file, and injects the active phase context into the prompt. This keeps the AI focused and prevents context drift.
-* **`hooks/check-gate`**: Fired on `Stop` (when the model tries to end the session). It acts as a termination oracle: if there are tasks in `task_plan.md` still marked as `[ ] pending` or `[/] in_progress`, it blocks the exit, prompting the model to complete the tasks first.
-* **`hooks/run-hook.cmd`**: A Windows CMD/PowerShell wrapper allowing shell hook scripts to execute seamlessly across OS boundaries.
+### 2. 生命周期拦截钩子 (Lifecycle Hooks Layer)
+* **`hooks/inject-plan`**：在 `PreToolUse`（模型调用任意工具前）和 `PreInvocation` 触发。它自动读取磁盘上的 `task_plan.md`，校验其哈希值是否与批准后的锁文件一致，并从 `progress.md` 提取最新进度，以安全 Nonce Delimiters 包装后注入上下文。防止模型在长周期开发中发生指令飘移或混淆。
+* **`hooks/check-gate`**：在 `Stop`（模型尝试退出/完成会话前）触发。充当“终结判定阀”：若检测到 `task_plan.md` 中仍有 `[ ] pending` 或 `[/] in_progress` 的任务，它将阻断退出，发出未完结警告，迫使大模型继续执行，杜绝未测先交付的侥幸心理。
+* **`hooks/run-hook.cmd`**：跨平台包装器。兼容 Windows PowerShell 和 CMD 环境，确保钩子脚本可在 Windows 和 Linux 下 100% 一致执行。
 
-### 3. The Rules (Skills)
-* **`skills/planning.md`**: Guides the AI on creating the "Triple-File Memory System" (`task_plan.md`, `findings.md`, `progress.md`) to survive context resets.
-* **`skills/tdd-workflow.md`**: Enforces strict test-first development with the **Delete Punishment** (if code is written before tests, it must be deleted).
-* **`skills/debugging.md`**: Enforces systematic root-cause tracing and the **3-Fixes Architecture Check** (re-plan instead of patching).
-* **`skills/testing-anti-patterns.md`**: Gates the AI from asserting on mock behavior or polluting production code with test-only helpers.
-* **`skills/condition-based-waiting.md`**: Forces the use of dynamic polling helpers rather than static delays (`sleep(50)`) to eliminate test flakiness.
+### 3. 通用开发规范 (Skills Layer)
+* **`skills/planning.md`**：指导 AI 建立并维护磁盘上的“三文件记忆体”（`task_plan.md`、`findings.md`、`progress.md`），以保障在上下文 compaction（压缩）或重置后，AI 能 100% 恢复任务上下文。
+* **`skills/tdd-workflow.md`**：确立 **TDD 铁律**与“删除惩罚机制”（写代码前必须先写 failing test，否则无条件就地删除代码重来）。
+* **`skills/debugging.md`**：定义系统化根因分析方法（反向调用链追踪、多组件仪器化）与 **3-Fixes 架构质疑**（3次尝试失败后必须重新评估设计，而非机械地修补 bug）。
+* **`skills/testing-anti-patterns.md`**：测试避坑指南。严禁对 Mock 进行断言、严禁在生产代码中注入测试专属接口、严禁局部 Mock。
+* **`skills/condition-based-waiting.md`**：异步测试稳定器。强制以 polling（状态轮询）代替 arbitrary timeouts（如硬等待 `sleep(50)`），从根本上消除 CI 环境下的 flaky tests（测试抖动）。
 
 ---
 
-## 🚀 End-to-End Daily Workflow Tutorial
+## 🚀 每日研发工作流实操教程
 
-Here is how you and Antigravity 2.0 work together on a feature:
+在日常使用 Antigravity 2.0 时，您与 AI 的协作将按照以下标准研发周期推进：
 
-### Step 1: Design Phase (Brainstorming Gate)
-You prompt the AI with a high-level requirement:
-> *"Let's build a notification queue system."*
+### 第一步：脑暴与设计 Spec 审查 (Brainstorming Gate)
+当您向 AI 提出一个高层需求时（例如：*"让我们做一个通知发送队列"*）：
+* **机制运作**：插件会自动扫描关键字并载入 `skills/brainstorming.md`。
+* **协作过程**：AI 会启动单问题提问机制（一次只问一个问题），逐步澄清边界，在 `.planning/design.md` 中输出设计规约（Spec），并等待您的显式批准。
 
-* **What happens**: Antigravity automatically detects matching keywords and loads `skills/brainstorming.md`. The AI is forced to clarify requirements by asking **one question at a time**, draft a design spec (`.planning/design.md`), and wait for your explicit approval.
+### 第二步：规划拆解与哈希锁定 (Plan & Lock)
+当您批准设计 Spec 后，对 AI 说：
+> *"设计通过，请开始编写执行计划并分解任务。"*
 
-### Step 2: Planning & Attestation
-Once you approve the spec, you tell the AI:
-> *"Design looks good, generate the implementation plan."*
-
-* **What happens**: The AI instantiates `templates/implementation_plan.md` to create `task_plan.md`, detailing files to modify, signatures consumed/produced, and precise TDD assertions.
-* **Attestation Locking**: Once the plan is finalized, you or the AI run the attestation command to calculate the hash:
+* **机制运作**：AI 会读取 `templates/implementation_plan.md`，创建 `task_plan.md`，将任务拆解为可独立测试的细粒度阶段（Phase），列出入参/出参接口。
+* **哈希锁定**：计划完成后，您或 AI 在终端运行哈希锁脚本：
   `powershell -File hooks/run-hook.cmd attest-plan`
-  This saves the hash to `.plan-attestation`, locking the plan.
+  这会计算 `task_plan.md` 的 SHA-256 并写入 `.plan-attestation`，锁定计划内容。
 
-### Step 3: Coding (Red-Green-Refactor)
-The AI initializes a clean sandbox branch using `skills/git-isolation.md` and begins working.
-* **What happens**: For each task, the AI writes the failing test first, compiles/runs it to watch it fail (RED), writes the minimum code to pass (GREEN), and refactors.
-* **Hook Injection**: On every tool call (like editing code), `hooks/inject-plan` runs, verifies that the plan hash matches `.plan-attestation` (blocking if tampered), and injects:
-  `===BEGIN-PLAN-DATA-<nonce>===` -> Current task status -> `===END-PLAN-DATA-<nonce>===`.
+### 第三步：分支隔离开发与 TDD 循环 (Execute)
+AI 自动在隔离的 `git worktree` 沙箱分支上开展工作（遵循 `skills/git-isolation.md`）。
+* **机制运作**：AI 针对每个子任务，先写测试用例（RED），运行看到其正确报错；然后编写最少量的代码使其通过（GREEN）；最后重构（REFACTOR）。
+* **后台审计**：每次 AI 调用修改工具或运行命令，`PreToolUse` 钩子均在后台验证计划文件的哈希一致性，杜绝恶意代码注入或悄悄篡改已批准的设计。
 
-### Step 4: Verification & Gated Termination
-Once the AI thinks it is done, it attempts to stop the session.
-* **What happens**: The `Stop` event triggers `hooks/check-gate`.
-  * **If any task is unfinished**: The gate blocks the exit and responds: *"Block reason: Phase X is still in_progress."* The AI is forced to continue executing.
-  * **If all tasks are complete**: The gate returns `exit 0`, allowing the AI to present the **4-Option Git Delivery Menu** (merge branch, run staging test, keep open, or rollback).
+### 第四步：门禁拦截与安全集成 (Gate & Delivery)
+当 AI 声称全部开发完成，并尝试结束会话时：
+* **机制运作**：`Stop` 生命周期事件触发 `hooks/check-gate`。
+  * **如果尚有子阶段未完成**：门禁强行阻断退出，AI 被迫留下来继续编码。
+  * **如果全部标记完成**：门禁放行，AI 自动根据 `skills/git-integration.md` 调出 **4选项交付菜单**（1. 自动合并主干；2. 保留 Staging 分支供人工审计；3. 挂起分支；4. 安全回滚清理）。
 
 ---
 
-## 📖 Global Settings & Best Practices
+## 💡 全局最佳实践建议
 
-1. **Keep Mocks Clean**: When the AI writes tests, it must strictly follow `skills/testing-anti-patterns.md`. If you notice mock assertions creeping in, prompt: *"Verify this against the mock testing gates."*
-2. **Never Hardcode Paths**: If you add new skills or templates, write paths relative to the project root (`./`) or use env variables.
-3. **Re-Attest on Plan Adjustments**: If requirements change mid-task, update `task_plan.md`, then re-run the attestation lock script so the hooks accept the updated plan hash.
+1. **测试防空转**：如果发现 AI 编写的测试只有对 mock 方法的 trace 调用，直接输入：“*请对照 testing-anti-patterns.md 检查你的测试隔离门禁。*”
+2. **零路径依赖**：如果您在项目中新建了特定语言的开发规范，请使用相对路径引用，确保 100% 的即插即用移植性。
+3. **重新 attest 机制**：若在开发中途必须调整任务步骤，请修改 `task_plan.md` 后，务必在终端执行 `attest-plan` 重新锁死哈希，否则生命周期钩子在执行后续工具时会因校验不一致而报警拦截。
