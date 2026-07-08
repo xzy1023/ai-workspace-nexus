@@ -1,0 +1,21 @@
+# System / OS
+.DS_Store
+Thumbs.db
+
+# IDEs
+.vscode/
+.idea/
+
+# Local / AI Workspace Temp Files
+.claude/
+.gemini/
+.agents/
+.private-journal/
+.worktrees/
+node_modules/
+
+# Local task planning states (if you want to ignore session files in subprojects)
+# task_plan.md
+# findings.md
+# progress.md
+# .planning/

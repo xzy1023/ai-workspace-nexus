@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+# check-gate - Gated stop check hook.
+#
+# Inspects task_plan.md to ensure no active or pending tasks remain.
+# If an incomplete task is found, it blocks completion (exit 2) to force continuation.
+
+set -euo pipefail
+
+PLAN_FILE="task_plan.md"
+MODE_FILE=".mode"
+
+# Resolve active plan directory (parallel mode)
+if [ -f ".planning/.active_plan" ]; then
+    ACTIVE_ID=$(cat ".planning/.active_plan" | tr -d '[:space:]')
+    PLAN_FILE=".planning/${ACTIVE_ID}/task_plan.md"
+    MODE_FILE=".planning/${ACTIVE_ID}/.mode"
+fi
+
+# Exit silently if no plan file exists
+if [ ! -f "$PLAN_FILE" ]; then
+    exit 0
+fi
+
+# Only enforce block if explicitly set to gated mode
+if [ -f "$MODE_FILE" ]; then
+    MODE=$(cat "$MODE_FILE" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')
+    if [ "$MODE" != "gated" ]; then
+        exit 0
+    fi
+else
+    # Default to advisory (non-blocking) in legacy mode
+    exit 0
+fi
+
+# Search for incomplete task checkboxes or pending phases
+# e.g., "- [ ]" or "Status: pending" or "Status: in_progress"
+if grep -q "\- \[ \]" "$PLAN_FILE" || grep -iq "Status: pending" "$PLAN_FILE" || grep -iq "Status: in_progress" "$PLAN_FILE"; then
+    echo "=== [GATED STOP BLOCKED] ==="
+    echo "The task plan on disk still contains incomplete or in-progress phases."
+    echo "You must complete all plan tasks before finishing execution."
+    echo "=== [GATED STOP BLOCKED] ==="
+    
+    # Exit with code 2 to signals the platform/harness to block the stop event
+    exit 2
+fi
+
+exit 0

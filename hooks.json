@@ -1,0 +1,38 @@
+{
+  "nexus-hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "write_file|edit_file|replace|create_file|patch|run_command|execute_command",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "./hooks/run-hook.cmd inject-plan",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PreInvocation": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "./hooks/run-hook.cmd inject-plan",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "./hooks/run-hook.cmd check-gate",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

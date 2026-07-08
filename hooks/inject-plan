@@ -1,0 +1,66 @@
+#!/usr/bin/env bash
+# inject-plan - Lifecycle hook for injecting task_plan.md context on prompt or tool events.
+#
+# Validates SHA-256 attestation prior to injection. If the plan is modified without
+# updating the attestation, it blocks injection with a [PLAN TAMPERED] warning.
+
+set -euo pipefail
+
+PLAN_FILE="task_plan.md"
+ATTEST_FILE=".plan-attestation"
+
+# Check if active plan path is redirected (parallel plan mode)
+if [ -f ".planning/.active_plan" ]; then
+    ACTIVE_ID=$(cat ".planning/.active_plan" | tr -d '[:space:]')
+    PLAN_DIR=".planning/${ACTIVE_ID}"
+    PLAN_FILE="${PLAN_DIR}/task_plan.md"
+    ATTEST_FILE="${PLAN_DIR}/.attestation"
+fi
+
+# Exit silently if no plan file exists
+if [ ! -f "$PLAN_FILE" ]; then
+    exit 0
+fi
+
+# If an attestation file exists, verify the plan hash
+if [ -f "$ATTEST_FILE" ]; then
+    EXPECTED_HASH=$(cat "$ATTEST_FILE" | tr -d '[:space:]')
+    # Compute current SHA-256 (OS-independent check)
+    if command -v sha256sum >/dev/null 2>&1; then
+        CURRENT_HASH=$(sha256sum "$PLAN_FILE" | awk '{print $1}')
+    elif command -v shasum >/dev/null 2>&1; then
+        CURRENT_HASH=$(shasum -a 256 "$PLAN_FILE" | awk '{print $1}')
+    elif command -v certutil.exe >/dev/null 2>&1; then
+        # Windows fallback inside Git Bash
+        CURRENT_HASH=$(certutil.exe -hashfile "$PLAN_FILE" SHA256 | grep -v ":" | grep -v "CertUtil" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')
+    else
+        CURRENT_HASH=""
+    fi
+
+    if [ -n "$CURRENT_HASH" ] && [ "$CURRENT_HASH" != "$EXPECTED_HASH" ]; then
+        echo -e "\n=== [PLAN TAMPERED] ==="
+        echo "WARNING: The task plan file has been modified without re-attestation."
+        echo "Run 'attest-plan' or update the attestation before executing any further tools."
+        echo "=== [PLAN TAMPERED] ===\n"
+        exit 1
+    fi
+fi
+
+# Generate session-specific nonce if configured, otherwise use static delimiters
+NONCE=""
+if [ -f ".planning/.nonce" ]; then
+    NONCE=$(cat ".planning/.nonce" | tr -d '[:space:]')
+fi
+
+# Inject the plan data
+if [ -n "$NONCE" ]; then
+    echo "===BEGIN-PLAN-DATA-${NONCE}==="
+    cat "$PLAN_FILE"
+    echo "===END-PLAN-DATA-${NONCE}==="
+else
+    echo "===BEGIN PLAN DATA==="
+    cat "$PLAN_FILE"
+    echo "===END PLAN DATA==="
+fi
+
+exit 0
