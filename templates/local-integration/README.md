@@ -17,7 +17,7 @@
   │     │     ├── api-contracts.md     # 内部与外部 API 签名及调用约定
   │     │     └── project-rules.md     # 当前项目的专属编码规范、依赖约束与发布门禁
   │     └── templates/
-  │           └── [项目专属模版]
+  │           └── local_task_plan.md   # 本地特化的简化执行计划模板
 ```
 
 ---
@@ -40,6 +40,11 @@
 全局 `ai-workspace-nexus` 提供了通用的架构原则，而在本项目中：
 * **代码目录结构**：业务逻辑写在 Application 层，数据访问写在 Infrastructure 层等。
 * **特定编译指令**：本地测试如何启动，是否需要依赖 Docker Compose 运行外部组件。
+
+### 4. [本地任务计划模板] `templates/local_task_plan.md`
+定义项目特化的任务执行规约与 TDD 自动化测试断言设计：
+* **架构契约表**：明确 Domain、Infrastructure、Application、Presentation 四层的输入消耗与输出产出关系。
+* **分层测试指令**：定义各层单元测试、集成测试与端到端控制器测试的具体运行命令和期望断言。
 
 ---
 
