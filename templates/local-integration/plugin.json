@@ -1,0 +1,8 @@
+{
+  "name": "project-local-nexus-extension",
+  "version": "1.0.0",
+  "description": "Project-specific guidelines, database schema mappings, API contracts, and testing conventions.",
+  "dependencies": {
+    "ai-workspace-nexus": ">=1.0.0"
+  }
+}

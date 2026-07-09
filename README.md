@@ -177,11 +177,12 @@ graph TD
 - [x] 建立文档级（Spec/Plan）静态白盒评审子智能体提示词模板：[spec-reviewer.md](agents/spec-reviewer.md) 和 [plan-reviewer.md](agents/plan-reviewer.md)。
 - [x] 建立平台生命周期钩子自动化校验与 plan 自动注入体系：[hooks.json](hooks.json) 及 [hooks/](hooks/)。
 - [x] 建立通用开发类 MCP 服务配置模板与安全声明：[mcp_config.json](mcp_config.json)。
-- [ ] 将定制后的通用规则一键同步发布到个人全局插件目录 `~/.gemini/config/plugins/ai-workspace-nexus`。
+- [x] 将定制后的通用规则一键同步发布到个人全局插件目录 `~/.gemini/config/plugins/ai-workspace-nexus`。
 
-### 📌 阶段 3：项目级特化应用 (Project Integration) `[未开始]`
-- [ ] 在具体业务项目中建立本地 `.agents/plugins/` 目录。
-- [ ] 编写专属于该项目的业务知识和接口规则。
+### 📌 阶段 3：项目级特化应用 (Project Integration) `[进行中]`
+- [x] 提供项目级本地化集成脚手架模板（位于 `templates/local-integration/`）。
+- [ ] 在具体业务项目（如 MpMES）根目录下初始化本地 `.gemini/` 运行配置，实现项目特化注入。
+- [ ] 编写专属于业务项目的特定业务知识（如数据库 Schema、接口规范、特殊发布流程）。
 
 ### 📌 阶段 4：全面扩展 (Full Expansion) `[未开始]`
 - [ ] 探索自定义子智能体配置（Custom Subagents）。
