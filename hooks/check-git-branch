@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# check-git-branch - Prevent direct modifications on master/main branch
+
+set -euo pipefail
+
+# Bypass gate if ALLOW_MASTER_WRITE=1 or a .allow-master-write file exists
+if [ "${ALLOW_MASTER_WRITE:-0}" = "1" ] || [ -f ".allow-master-write" ]; then
+    exit 0
+fi
+
+# Get the current branch name
+CURRENT_BRANCH=$(git branch --show-current 2>/dev/null || true)
+
+if [ "$CURRENT_BRANCH" = "master" ] || [ "$CURRENT_BRANCH" = "main" ]; then
+    echo -e "\n=== [GIT ISOLATION VIOLATION] ==="
+    echo "ERROR: Direct modification of files on '$CURRENT_BRANCH' branch is prohibited."
+    echo "Please check out an isolated feature branch (e.g., branch-name) before modifying files."
+    echo "To bypass this, set: export ALLOW_MASTER_WRITE=1 or touch .allow-master-write"
+    echo "=== [GIT ISOLATION VIOLATION] ===\n"
+    exit 1
+fi
+
+exit 0

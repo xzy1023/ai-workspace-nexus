@@ -36,8 +36,10 @@ Before creating a new worktree, verify if you are already operating in an isolat
 
 ### Step 1: Create Isolated Workspace
 1. **Native Tools First**: Before using `git worktree add`, check if your platform or harness provides a native workspace creation tool (e.g. a built-in worktree command, `/worktree` slash command, or `EnterWorktree`-style tool). If it exists, **use it instead of raw git commands**. Native tools manage directory placement, branch creation, and cleanup automatically. Using `git worktree add` when a native tool exists creates phantom state the host cannot see or manage.
-2. **Request Consent**: Ask the user for permission to create a worktree unless specified otherwise:
-   > "Would you like me to set up an isolated git worktree for this task?"
+2. **Mandatory Interactive Consent (No Bypasses)**: Before modifying any files or running build/test commands, you MUST explicitly ask the user to choose the development mode. You are strictly forbidden from assuming, bypassing, or choosing a mode yourself under any circumstances. Present exactly this query to the user and wait for their choice:
+   > "The implementation plan is approved. Before I start modifying code, please select the development mode:
+   > 1. **Isolated Branch Mode**: I will set up an isolated git worktree for safe development and testing. (Recommended)
+   > 2. **Direct Master Mode**: I will directly edit files on the current master/main branch."
 3. **Select Directory** (priority order):
    * Explicit user/instructions preference → use that path
    * `.worktrees/` exists in project root → use it

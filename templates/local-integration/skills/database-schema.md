@@ -1,59 +1,32 @@
 ---
 name: database-schema
-description: Use when generating database migrations, writing Entity Framework mappings, querying tables, or updating db schema definitions.
+description: Use when generating EF database migrations, writing Entity Framework entity mappings, or designing raw SQL queries.
 ---
 
-# 数据库结构与设计契约 (database-schema.md)
+# 数据库核心契约与开发约定 (database-schema.md)
 
-## 📌 概述
-本文件用于沉淀当前项目的数据库结构，作为 AI 在编写任何 SQL 语句、Entity Framework 实体映射、Dapper 查询时的**唯一事实来源（Single Source of Truth）**。这能有效杜绝 AI 在字段名、数据类型或外键关联上产生幻觉。
+> [!WARNING]
+> **Token 管理警告：**
+> 如果您的项目数据库包含大量数据表（超过 10 张表），**请不要在此文件中罗列具体的字段明细**。大模型加载该 skill 会耗费大量 Token。
+> 推荐的做法是：将详细的表结构存放在 `docs/database/SCHEMA_*.md` 中，作为 AI 仅在需要时通过 `view_file` 自主查阅的参考知识；
+> 而在当前文件中，只沉淀**核心实体关系与全局开发铁律**。
 
----
+## 🗄️ 数据库开发红线
 
-## 🗄️ 数据库开发铁律
-
-1. **零字段硬编码**：实体命名与表字段定义必须完全遵循下方列表。如果需要访问新字段，必须先更新此规范或由开发者确认。
-2. **软删除约定**：所有业务表统一使用 `IsDeleted` 字段（`bool` 或 `bit` 类型）表示删除状态，绝不允许硬删除（`DELETE FROM`），查询时必须全局过滤 `IsDeleted = 0`。
-3. **审计跟踪字段**：
-   * `CreatedTime` (DateTime) - 创建时间
-   * `UpdatedTime` (DateTime) - 修改时间
-   * `CreatedBy` (Guid/string) - 创建人唯一标识
-   * `UpdatedBy` (Guid/string) - 更新人唯一标识
-
----
-
-## 🗺️ 核心数据表结构清单 (请根据项目实际修改)
-
-### 1. 用户表 (`Users`)
-* **作用**：存储系统登录账号与用户基础信息
-* **字段清单**：
-  | 字段名 | 类型 | 约束 | 描述 |
-  | :--- | :--- | :--- | :--- |
-  | `Id` | `Guid` | PK | 唯一主键 |
-  | `Username` | `nvarchar(50)` | Unique, Not Null | 登录用户名 |
-  | `PasswordHash` | `varchar(256)` | Not Null | 加密后的密码哈希 |
-  | `Email` | `nvarchar(100)` | Nullable | 电子邮箱 |
-  | `IsDeleted` | `bit` | Default 0 | 软删除状态 |
-
-### 2. 角色表 (`Roles`)
-* **作用**：定义权限角色
-* **字段清单**：
-  | 字段名 | 类型 | 约束 | 描述 |
-  | :--- | :--- | :--- | :--- |
-  | `Id` | `Guid` | PK | 主键 |
-  | `Code` | `varchar(50)` | Unique, Not Null | 角色代码 (如 Admin, Operator) |
-  | `Name` | `nvarchar(50)` | Not Null | 角色显示名称 |
-
-### 3. 用户角色关联表 (`UserRoles`)
-* **作用**：维护多对多映射
-* **字段清单**：
-  | 字段名 | 类型 | 约束 | 描述 |
-  | :--- | :--- | :--- | :--- |
-  | `UserId` | `Guid` | FK -> Users.Id | 用户 ID |
-  | `RoleId` | `Guid` | FK -> Roles.Id | 角色 ID |
+1. **统一软删除**：
+   * 所有业务表必须继承或包含 `IsDeleted` 字段（`bit`/`bool`）。
+   * 严禁在应用层代码中编写物理删除逻辑（`DELETE` / `dbContext.Remove` 需配合 EF Interceptor 自动转化为软删除）。
+2. **自动化审计时间戳**：
+   * 写入时自动填充：`CreatedTime` (DateTime), `CreatedBy` (Guid/string)。
+   * 修改时自动填充：`UpdatedTime` (DateTime), `UpdatedBy` (Guid/string)。
+3. **数据类型契约**：
+   * 所有涉及主键/外键的物理 ID 必须统一使用 `Guid` 类型，且由客户端或业务层生成（而非数据库自增），以支持离线生成与断网重连。
+   * 所有表示系统状态、配置或规则关联的软连接（如 DowntimeReason、UserRole），必须使用自然键 `string Code`（如 `varchar(50)`）进行弱关联，禁止使用 `Guid`，以便于跨环境同步配置。
 
 ---
 
-## ⚙️ 索引与性能规范
-* **外键索引**：所有外键列（如 `UserRoles.UserId`）必须显式创建非聚集索引（Non-Clustered Index），严禁在无索引的列上进行高频 `JOIN` 操作。
-* **联合索引顺序**：在编写多条件查询时，遵循最左前缀原则（Leftmost Prefixing），并与此规范中声明的联合索引保持一致。
+## 🗺️ 核心表链接指引 (请根据项目实际修改)
+
+详细的数据字典由大模型根据具体任务，通过 `view_file` 工具按需读取以下参考路径：
+* [MES 业务数据库设计字典](file:///docs/database/SCHEMA_MES.md) — 包含 Pallets, Orders, Users 表字段细节。
+* [ERP 暂存区隔离设计字典](file:///docs/database/SCHEMA_IMPORTDATA.md) — 包含 ImportData 表结构。

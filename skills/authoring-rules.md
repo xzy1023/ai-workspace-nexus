@@ -81,3 +81,15 @@ Before writing a rule, classify the type of agent failure to select the correct 
   * **Correct Form**: Structural templates with explicitly marked, mandatory fields/placeholders.
 * **Conditional Behavior Failures** (Agent should do X only when condition Y is true):
   * **Correct Form**: Conditional keyed to a directly **observable predicate** (e.g., "If the brief file exists, reference it"). A rule that carries exemption clauses ("unless it matters", "if necessary") reopens negotiation — write the exception as its own observable branch instead.
+
+---
+
+## 🔄 Master-to-Global Deployment Cycle
+
+To prevent rules from diverging or updates being applied only to one side, you MUST follow this strict two-step execution cycle whenever editing any file in this repository (under `skills/`, `templates/`, or `hooks/`):
+
+1. **Workspace First**: Always perform edits directly on the file path inside this active workspace (e.g., `skills/git-isolation.md`).
+2. **Immediate Deployment**: In the very same tool execution turn, you MUST run a shell command (e.g., `Copy-Item`) to synchronize and overwrite the modified file into the active global profile config directory:
+   `C:\Users\Xiao\.gemini\config\plugins\ai-workspace-nexus/`
+3. **No Direct Config Edits**: You are strictly forbidden from editing files directly inside `C:\Users\Xiao\.gemini/` without first applying the change to the workspace source files.
+

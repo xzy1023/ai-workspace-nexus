@@ -2,7 +2,17 @@
   "nexus-hooks": {
     "PreToolUse": [
       {
-        "matcher": "write_file|edit_file|replace|create_file|patch|run_command|execute_command",
+        "matcher": "write_file|edit_file|replace|create_file|patch|write_to_file|replace_file_content|multi_replace_file_content",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "./hooks/run-hook.cmd check-git-branch",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "matcher": "write_file|edit_file|replace|create_file|patch|run_command|execute_command|write_to_file|replace_file_content|multi_replace_file_content",
         "hooks": [
           {
             "type": "command",

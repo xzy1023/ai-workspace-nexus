@@ -17,50 +17,84 @@ if [ -f ".planning/.active_plan" ]; then
     ATTEST_FILE="${PLAN_DIR}/.attestation"
 fi
 
-# Exit silently if no plan file exists
-if [ ! -f "$PLAN_FILE" ]; then
-    exit 0
-fi
+# Inject the plan data if it exists
+if [ -f "$PLAN_FILE" ]; then
+    # If an attestation file exists, verify the plan hash
+    if [ -f "$ATTEST_FILE" ]; then
+        EXPECTED_HASH=$(cat "$ATTEST_FILE" | tr -d '[:space:]')
+        # Compute current SHA-256 (OS-independent check)
+        if command -v sha256sum >/dev/null 2>&1; then
+            CURRENT_HASH=$(sha256sum "$PLAN_FILE" | awk '{print $1}')
+        elif command -v shasum >/dev/null 2>&1; then
+            CURRENT_HASH=$(shasum -a 256 "$PLAN_FILE" | awk '{print $1}')
+        elif command -v certutil.exe >/dev/null 2>&1; then
+            # Windows fallback inside Git Bash
+            CURRENT_HASH=$(certutil.exe -hashfile "$PLAN_FILE" SHA256 | grep -v ":" | grep -v "CertUtil" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')
+        else
+            CURRENT_HASH=""
+        fi
 
-# If an attestation file exists, verify the plan hash
-if [ -f "$ATTEST_FILE" ]; then
-    EXPECTED_HASH=$(cat "$ATTEST_FILE" | tr -d '[:space:]')
-    # Compute current SHA-256 (OS-independent check)
-    if command -v sha256sum >/dev/null 2>&1; then
-        CURRENT_HASH=$(sha256sum "$PLAN_FILE" | awk '{print $1}')
-    elif command -v shasum >/dev/null 2>&1; then
-        CURRENT_HASH=$(shasum -a 256 "$PLAN_FILE" | awk '{print $1}')
-    elif command -v certutil.exe >/dev/null 2>&1; then
-        # Windows fallback inside Git Bash
-        CURRENT_HASH=$(certutil.exe -hashfile "$PLAN_FILE" SHA256 | grep -v ":" | grep -v "CertUtil" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')
+        if [ -n "$CURRENT_HASH" ] && [ "$CURRENT_HASH" != "$EXPECTED_HASH" ]; then
+            echo -e "\n=== [PLAN TAMPERED] ==="
+            echo "WARNING: The task plan file has been modified without re-attestation."
+            echo "Run 'attest-plan' or update the attestation before executing any further tools."
+            echo "=== [PLAN TAMPERED] ===\n"
+            exit 1
+        fi
+    fi
+
+    # Generate session-specific nonce if configured, otherwise use static delimiters
+    NONCE=""
+    if [ -f ".planning/.nonce" ]; then
+        NONCE=$(cat ".planning/.nonce" | tr -d '[:space:]')
+    fi
+
+    # Inject the plan data
+    if [ -n "$NONCE" ]; then
+        echo "===BEGIN-PLAN-DATA-${NONCE}==="
+        cat "$PLAN_FILE"
+        echo "===END-PLAN-DATA-${NONCE}==="
     else
-        CURRENT_HASH=""
-    fi
-
-    if [ -n "$CURRENT_HASH" ] && [ "$CURRENT_HASH" != "$EXPECTED_HASH" ]; then
-        echo -e "\n=== [PLAN TAMPERED] ==="
-        echo "WARNING: The task plan file has been modified without re-attestation."
-        echo "Run 'attest-plan' or update the attestation before executing any further tools."
-        echo "=== [PLAN TAMPERED] ===\n"
-        exit 1
+        echo "===BEGIN PLAN DATA==="
+        cat "$PLAN_FILE"
+        echo "===END PLAN DATA==="
     fi
 fi
 
-# Generate session-specific nonce if configured, otherwise use static delimiters
-NONCE=""
-if [ -f ".planning/.nonce" ]; then
-    NONCE=$(cat ".planning/.nonce" | tr -d '[:space:]')
+# ==============================================================================
+# Inject Global and Local Skills
+# ==============================================================================
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+# Inject all global skills from ai-workspace-nexus
+NEXUS_SKILLS_DIR="${SCRIPT_DIR}/../skills"
+if [ -d "$NEXUS_SKILLS_DIR" ]; then
+    echo "===BEGIN GLOBAL SKILLS==="
+    for skill_file in "$NEXUS_SKILLS_DIR"/*.md; do
+        if [ -f "$skill_file" ]; then
+            skill_name=$(basename "$skill_file" .md)
+            echo "--- SKILL: ${skill_name} ---"
+            cat "$skill_file"
+            echo "--------------------------"
+        fi
+    done
+    echo "===END GLOBAL SKILLS==="
 fi
 
-# Inject the plan data
-if [ -n "$NONCE" ]; then
-    echo "===BEGIN-PLAN-DATA-${NONCE}==="
-    cat "$PLAN_FILE"
-    echo "===END-PLAN-DATA-${NONCE}==="
-else
-    echo "===BEGIN PLAN DATA==="
-    cat "$PLAN_FILE"
-    echo "===END PLAN DATA==="
+# Inject all local project-specific skills
+LOCAL_SKILLS_DIR=".gemini/skills"
+if [ -d "$LOCAL_SKILLS_DIR" ]; then
+    echo "===BEGIN LOCAL SKILLS==="
+    for skill_file in "$LOCAL_SKILLS_DIR"/*.md; do
+        if [ -f "$skill_file" ]; then
+            skill_name=$(basename "$skill_file" .md)
+            echo "--- SKILL: ${skill_name} ---"
+            cat "$skill_file"
+            echo "--------------------------"
+        fi
+    done
+    echo "===END LOCAL SKILLS==="
 fi
 
 exit 0

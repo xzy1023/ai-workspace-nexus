@@ -1,64 +1,66 @@
 ---
 name: api-contracts
-description: Use when creating REST API controllers, designing payload DTOs, configuring authentication policies, or documenting client-server communication contracts.
+description: Use when designing REST API endpoints, writing controllers, configuring authentication scopes, or debugging integration payloads.
 ---
 
 # API 接口契约与通信规约 (api-contracts.md)
 
-## 📌 概述
-本文件定义了本项目中所有 REST API 的路由规范、身份鉴权机制、输入验证规则及标准 JSON 响应结构。AI 在编写控制器（Controller）或路由分发器时，**必须**严格遵循此契约。
+> [!WARNING]
+> **Token 管理警告：**
+> 如果您的项目包含大量 API 接口，**请不要在 skill 中罗列具体的接口字段定义**（如全量 Swagger/JSON 报文样例）。这会导致上下文膨胀。
+> 应该将详细的 Payload 细节及硬件通信协议存放在 `docs/reference/` 下作为静态参考；
+> 在本文件中只保留**全局路由规范、异常错误码分流机制以及通用安全机制**。
 
 ---
 
-## 🔒 身份鉴权与安全
-1. **Bearer Token 验证**：所有受保护的 API 必须在 HTTP 请求头中携带 `Authorization: Bearer <token>`。
-2. **鉴权注解**：对于非公开接口，控制器类或方法上必须挂载 `[Authorize]`（C#）或相对应的权限中间件拦截器，严禁裸露敏感接口。
+## 🔒 安全鉴权机制
+
+1. **统一 Bearer JWT**：非公开接口必须在请求头中携带 `Authorization: Bearer <JWT_TOKEN>`。
+2. **多 Scheme 隔离（如适用）**：
+   * `Operator` 终端客户端使用设备密钥或 JWT 进行 API 访问，具有受限的角色范围。
+   * `Admin` 网页端在局域网内可启用 SSO / Windows Negotiate 身份认证。
 
 ---
 
-## 🌐 路由与版本控制
+## 🌐 路由与版本规约
 
-* **路由命名规约**：统一采用小驼峰（camelCase）或小写蛇形（kebab-case）命名，且必须包含 API 版本号前缀。
+* **API 前缀**：所有外部暴露的路由必须统一使用小写，并显式包含版本号前缀：
   * ❌ *错误*：`/api/GetUserInfo?id=123`
   * ✅ *正确*：`/api/v1/users/{id}`
-* **HTTP 动词选择规范**：
-  * `GET`：安全且幂等的查询操作，不允许修改任何系统状态。
-  * `POST`：创建新资源，响应应返回 201 Created 及资源主键。
-  * `PUT`：全量更新已存在的资源。
-  * `DELETE`：软删除指定资源。
+* **HTTP 语义约定**：
+  * `GET`：查询操作，必须保证幂等和只读。
+  * `POST`：创建资源，成功响应应返回 `201 Created` 状态码。
+  * `PUT` / `PATCH`：更新资源。
+  * `DELETE`：软删除资源。
 
 ---
 
-## 📦 统一响应数据结构
+## 📦 统一错误码与异常分流机制
 
-所有 API 响应统一封包为以下 JSON 格式。不允许返回裸原始数据或非结构化文本：
+为了统一客户端对异常的处理流程，所有的接口错误必须统一封包。严禁直接抛出裸 500 HTML 页面。
 
-### 1. 成功响应结构 (200 OK / 201 Created)
-```json
-{
-  "success": true,
-  "code": "SUCCESS",
-  "message": "操作成功",
-  "data": {
-    "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
-    "username": "admin"
-  }
-}
-```
-
-### 2. 失败与异常响应结构 (400 Bad Request / 500 Error)
-* 在返回错误时，必须提供可读的业务代码（Code）与友好提示（Message）：
+### 1. 业务逻辑层校验失败 (400 Bad Request)
+在应用层规则校验未通过时（如余额不足、库存短缺），使用统一的 Result 包装并返回业务错误码：
 ```json
 {
   "success": false,
-  "code": "USER_NOT_FOUND",
-  "message": "指定的用户账号不存在，请检查后重试",
+  "code": "ORDER_ALREADY_CLOSED",
+  "message": "当前生产工单已被关闭，无法创建新的托盘 record",
   "data": null
 }
 ```
 
----
+### 2. 身份/授权校验失败 (401 Unauthorized / 403 Forbidden)
+* **401**: 凭证无效或过期。
+* **403**: 当前用户无相应功能操作权限（例如缺少 `Supervisor` 角色）。
 
-## 🛡️ 数据合法性验证 (Validation Gate)
-* AI 编写的 DTO / Model 必须包含声明式属性验证。
-* 任何业务逻辑处理前，必须进行 `ModelState.IsValid` 校验。如果不合法，立即返回 400 Bad Request 伴随相应的验证错误明细。
+### 3. 未捕获的系统异常 (500 Internal Server Error)
+系统最外层拦截器自动捕获异常并记录 TraceId，向客户端返回脱敏的友好提示：
+```json
+{
+  "success": false,
+  "code": "SYSTEM_ERROR",
+  "message": "系统出现未预期的错误，请联系系统管理员。TraceId: 8f9a2b...",
+  "data": null
+}
+```

@@ -9,7 +9,8 @@ Declaring work is complete without fresh evidence is an engineering failure. Thi
 ```
 NO COMPLETION CLAIMS WITHOUT FRESH VERIFICATION EVIDENCE.
 ```
-If you have not run the verification command in the current turn, you cannot claim the feature works, tests pass, or builds succeed.
+1. If you have not run the verification command in the current turn, you cannot claim the feature works, tests pass, or builds succeed.
+2. **Mandatory Progress Sync**: Before committing any code (Git Commit) or declaring a task complete, you MUST update all project-specific progress tracking files (e.g. `PROGRESS_TRACKER.md` or other planning trackers in the repo), marking completed tasks as `[x]`. You are strictly forbidden from concluding a session without syncing the project tracker.
 
 ---
 

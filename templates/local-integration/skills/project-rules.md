@@ -1,55 +1,58 @@
 ---
 name: project-rules
-description: Use when structuring project folders, managing dependency references, adding external libraries, or running build / lint gate scripts.
+description: Use when writing or reviewing code in the core backend, api, or contract projects. Covers project-specific layer boundaries, CQRS conventions, and custom validation policies.
 ---
 
 # 项目特化编码规约与架构限制 (project-rules.md)
 
-## 📌 概述
-本文件定义了本项目的分层依赖方向、第三方库引入门禁、以及 CI/CD 自动发布前的本地门禁指标。大模型在新增任何服务类、引入依赖包或重构包结构时，**必须**遵循此边界。
+> 全局 C# 最佳实践（如 Primary Constructors 强制用、Sealed by Default、TimeProvider 注入、EF Core N+1 避免、DI Scope 保护、PeriodicTimer 用法、FluentAssertions + NSubstitute 测试标准、TDD 三击协议）均已由全局 `csharp-guidelines.md` 覆盖。**本文件仅声明当前项目专属的架构边界与特化重写**。
+
+## 🌿 分支前缀与提交规范
+* **分支命名**：`feature/[TaskID]-[Description]` 或 `fix/[TaskID]-[BugName]`（需与项目排期/Issue Tracker 关联）。
+* **提交作用域 (Commit Scope)**：Conventional Commits 必须匹配对应的底层模块/项目（如 `feat(domain): add UserEntity`）。
 
 ---
 
-## 🏛️ 分层依赖限制 (Dependency Direction)
+## 🏛️ 项目分层与依赖方向红线 (Dependency Boundaries)
 
-本项目遵循严格的**干净架构（Clean Architecture / DDD）**分层模型，依赖方向必须单向向内，严禁反向依赖：
+本项目遵循 Clean Architecture / DDD 设计，严格限制层级引用流向：
 
 ```
 [ Presentation (Web / API) ] ──> [ Application (业务编排) ]
              │                                │
              ▼                                ▼
-[ Infrastructure (基础设施) ] ──> [ Domain (领域模型/接口) ]
+[ Infrastructure (基础设施) ] ──> [ Domain (领域模型) ]
 ```
 
-1. **Domain 领域层**：
-   * 必须保持绝对纯净。
-   * **不允许**依赖任何第三方框架（如 EF Core、AutoMapper 或数据库驱动），只能依赖基本的 C# 系统库。
-2. **Application 应用层**：
-   * 包含业务用例实现，仅依赖 Domain 层。
-   * 数据访问、消息队列等通过接口（Interfaces）注入，不允许直接引用基础设施层的具体实现类。
-3. **Infrastructure 基础设施层**：
-   * 实现 Application/Domain 定义的接口。
-   * 允许引入 Entity Framework、Redis、RabbitMQ 等具体物理媒介依赖。
+1. **领域层 (`Project.Domain`)**：
+   * **绝对纯净**：不允许依赖 EF Core、MediatR、Redis 或任何特定外部数据库客户端。只能是纯 C# 模型与领域接口。
+2. **应用层 (`Project.Application`)**：
+   * **仓储隔离**：不允许直接引用 EF 的 `DbContext` 或 Redis 实例。必须通过应用层接口（如 `IUnitOfWork`、`IRepository`）进行松耦合注入。
+3. **接口呈现层 (`Project.Presentation` / `Project.Api`)**：
+   * **DTO 隔离**：Controller 绝不允许直接返回 Domain 实体以防止数据库 Schema 泄漏。所有对外传输数据必须使用 `Contracts` 层定义的 DTO。
 
 ---
 
-## 🚫 外部包引入限制 (Package & Dependency Gate)
-* **严禁滥用外部库**：AI 在尝试通过 NuGet / npm 安装新包之前，**必须**向开发者申请许可。
-* 严禁为了简写几行逻辑而引入庞大的、未经审计的第三方工具包。
+## 📦 CQRS 与数据契约规范
+
+如果本项目采用了 CQRS (Command Query Responsibility Segregation) 架构：
+* **Requests (输入入参)**：用于 API 输入和前端 Form 绑定的模型，必须使用 **属性样式 `{ get; set; }`**，以便兼容各类反序列化器与表单双向绑定。
+* **DTOs (输出出参)**：只读的数据返回对象，必须使用 **C# Positional record 语法** (`public record UserDto(Guid Id, string Name)`) 以保证传输过程中的不可变性。
+* **读写分离**：Query（查询）处理器必须显式禁用追踪（如 `.AsNoTracking()`），且严禁在其内部调用 `SaveChangesAsync()` 等数据写回操作。
 
 ---
 
-## 🧪 本地测试与发布前校验门禁 (Pre-Flight Gate)
-在向 `main` 分支提价或发起 Pull Request 前，必须在隔离沙箱中本地成功运行以下命令并达成 100% 通过率：
+## 🛡️ 数据合法性验证 (Validation Gate)
 
-```bash
-# 1. 确保代码格式符合 EditorConfig
-dotnet format --verify-no-changes
+本项目执行**双层验证隔离机制**：
+1. **Stateless 第一层验证 (`Project.Validators`)**：纯内存数据格式检查（非空、长度、正则匹配等），不允许引入数据库依赖。
+2. **Stateful 第二层验证 (`Project.Application`)**：通过 FluentValidation 异步管道或 Handler 内部逻辑进行，允许查询数据库（例如检查用户名是否重复、外键 ID 是否真实存在）。
 
-# 2. 确保没有编译警告（TreatWarningsAsErrors 应开启）
-dotnet build -c Release
+---
 
-# 3. 运行所有自动化测试用例，覆盖率不低于 80%
-dotnet test --collect:"XPlat Code Coverage"
-```
-* **阻断规则**：只要上述任意一条命令报错，大模型必须无条件回滚相关修改，转入 `debugging.md` 重新修复，绝不允许带病交付。
+## 🧪 项目特化测试规约
+
+> 通用的 xUnit runner、FluentAssertions/NSubstitute 使用方法以及 AAA 测试结构均继承自全局规则。
+
+* **数据库测试隔离**：本地集成测试**严禁使用 InMemoryDatabase**。必须使用真实的临时/测试数据库（如本地开发 SQL Server 或 Docker Testcontainers），并通过在基类 Fixture 中包裹 `TransactionScope` 实现测试后的自动 `Rollback`。
+* **Mock 边界**：在单元测试中只 Mock 基础设施（如第三方短信网关、文件服务），对于本项目的 Domain 业务实体和 Domain Service 必须使用真实对象进行断言。
