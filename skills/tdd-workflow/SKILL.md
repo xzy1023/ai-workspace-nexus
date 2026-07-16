@@ -1,6 +1,18 @@
-# Test-Driven Development (TDD) & Error Recovery Guidelines (tdd-workflow.md)
+---
+name: tdd-workflow
+description: Use when writing production code, compilation iteration, or test runs. Enforces the Test-Driven Development (TDD) cycle and the 3-Strike Error Protocol.
+---
 
-## 📌 Overview & Objectives
+# Test-Driven Development & Error Recovery Guidelines
+
+## When to use this skill
+Use this skill when:
+- Modifying logic in production code.
+- Running unit or integration tests.
+- Compiling code and diagnosing build errors.
+- Encountering persistent test failures (applies the 3-Strike Error Protocol).
+
+## How to use it
 This skill ensures all production code remains highly testable, cohesive, and decoupled. It enforces the "test-first" methodology and integrates a structured "3-Strike Error Protocol" to prevent agents from falling into blind retry loops during debugging.
 
 ---

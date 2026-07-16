@@ -1,6 +1,17 @@
-# Verification Before Completion Guidelines (verification.md)
+---
+name: verification
+description: Use when verifying code changes, running tests before completion, or preparing task delivery evidence. Enforces the Iron Law of Verification.
+---
 
-## 📌 Overview & Objectives
+# Verification Before Completion Guidelines
+
+## When to use this skill
+Use this skill when:
+- Preparing to commit changes or mark a task as completed.
+- Gathering execution evidence (build/test command outputs).
+- Verifying the stability of code changes under the Iron Law of Verification.
+
+## How to use it
 Declaring work is complete without fresh evidence is an engineering failure. This skill mandates that any success, completion, or readiness claim is backed by fresh, unaltered execution outputs.
 
 ---

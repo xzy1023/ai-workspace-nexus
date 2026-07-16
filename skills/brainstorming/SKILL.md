@@ -1,6 +1,18 @@
-# Collaborative Requirement Clarification & Design (brainstorming.md)
+---
+name: brainstorming
+description: Use when analyzing user requirements, brainstorming design specs, or initiating a task design phase. Enforces the Design Before Code gate.
+---
 
-## 📌 Overview & Objectives
+# Collaborative Requirement Clarification & Design
+
+## When to use this skill
+Use this skill when:
+- Analyzing user requirements.
+- Brainstorming design specifications for a new task.
+- Initiating the requirement clarification phase.
+- Breaking down a large requirement into manageable sub-projects.
+
+## How to use it
 This skill guides the transition from a user's initial high-level idea into a validated design spec before any implementation plan is created or code is written. It enforces the "Design before Code" gate, specifies decomposition criteria for large requests, and structures human-agent alignment to avoid wasted development cycles.
 
 ---

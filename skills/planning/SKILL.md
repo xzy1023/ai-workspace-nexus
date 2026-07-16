@@ -1,6 +1,17 @@
-# Task Planning & Persistent File Memory Guidelines (planning.md)
+---
+name: planning
+description: Use when creating or refining implementation plans, logging findings, or updating progress during a task. Enforces the Triple-File Memory System.
+---
 
-## 📌 Overview & Objectives
+# Task Planning & Persistent File Memory Guidelines
+
+## When to use this skill
+Use this skill when:
+- Creating a detailed implementation plan for an approved design spec.
+- Maintaining the disk-based Triple-File Memory System (task_plan.md, findings.md, progress.md) during complex tasks.
+- Restructuring logic, updating task progress, or resuming work after a session reboot.
+
+## How to use it
 This skill establishes a **disk-based persistent working memory and planning engine** for AI agents. By persisting volatile context state to disk files, it prevents information loss during context window compaction, context overflow, or session resets. It enforces rigorous task decomposition ensuring each task step is independently testable.
 
 ---

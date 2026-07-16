@@ -1,6 +1,18 @@
-# Secure Branch Integration & Cleanup (git-integration.md)
+---
+name: git-integration
+description: Use when completing a task, merging git branches, cleaning up worktrees, or presenting the delivery menu.
+---
 
-## 📌 Overview & Objectives
+# Secure Branch Integration & Cleanup
+
+## When to use this skill
+Use this skill when:
+- Finishing a development branch.
+- Merging feature changes back to the base branch.
+- Dismantling isolated git worktrees.
+- Presenting the delivery menu for code release.
+
+## How to use it
 This skill defines the protocol for completing development branches, integrating code back to the main branch, and cleaning up sandbox directories created during task isolation. It prevents merging untested code, avoids directory lock issues in Git worktrees, and protects against accidental data deletion.
 
 ---

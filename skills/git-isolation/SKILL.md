@@ -1,6 +1,17 @@
-# Git Worktree & Workspace Isolation Guidelines (git-isolation.md)
+---
+name: git-isolation
+description: Use when initiating a new coding task, setting up a branch environment, or preparing git workspaces. Enforces worktree isolation and mandatory user consent.
+---
 
-## 📌 Overview & Objectives
+# Git Worktree & Workspace Isolation Guidelines
+
+## When to use this skill
+Use this skill when:
+- Starting a new coding task.
+- Proposing changes to the codebase and checking out feature branches.
+- Creating an isolated git worktree environment.
+
+## How to use it
 This skill ensures development task isolation, protecting your main working branch from unverified code changes during subagent tasks or parallel features. It outlines how to set up, verify, and dismantle isolated workspaces using git worktrees.
 
 ---
