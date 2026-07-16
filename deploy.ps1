@@ -29,7 +29,7 @@ Copy-Item -Path "skills\*" -Destination $SKILLS_TARGET -Recurse -Force
 Write-Host "  Skills synced successfully." -ForegroundColor Green
 
 # 3. Concatenate and Deploy Rules to GEMINI.md
-Write-Host "[3/6] Compiling rules into $GEMINI_MD_TARGET..." -ForegroundColor Yellow
+Write-Host "[3/5] Compiling rules into $GEMINI_MD_TARGET..." -ForegroundColor Yellow
 $RuleFiles = @(
     "rules\authoring-rules.md",
     "rules\csharp-guidelines.md",
@@ -56,7 +56,8 @@ foreach ($RuleFile in $RuleFiles) {
         $GeminiContent += "---"
         $GeminiContent += "# Rule: $Title"
         $GeminiContent += ""
-        $GeminiContent += (Get-Content -Raw -Path $RuleFile)
+        # Read file with UTF-8 encoding
+        $GeminiContent += (Get-Content -Raw -Encoding UTF8 -Path $RuleFile)
         $GeminiContent += ""
         Write-Host "  Merged: $RuleFile" -ForegroundColor DarkGreen
     } else {
@@ -64,11 +65,12 @@ foreach ($RuleFile in $RuleFiles) {
     }
 }
 
-[System.IO.File]::WriteAllText($GEMINI_MD_TARGET, ($GeminiContent -join "`r`n"))
+# Write file with UTF-8 encoding
+[System.IO.File]::WriteAllText($GEMINI_MD_TARGET, ($GeminiContent -join "`r`n"), [System.Text.Encoding]::UTF8)
 Write-Host "  Global rules merged successfully." -ForegroundColor Green
 
 # 4. Deploy Hooks & Rewrite hooks.json
-Write-Host "[4/6] Deploying hooks to $HOOKS_TARGET..." -ForegroundColor Yellow
+Write-Host "[4/5] Deploying hooks to $HOOKS_TARGET..." -ForegroundColor Yellow
 if (Test-Path "$HOOKS_TARGET\*") {
     Remove-Item -Path "$HOOKS_TARGET\*" -Recurse -Force -ErrorAction SilentlyContinue
 }
@@ -76,7 +78,7 @@ Copy-Item -Path "hooks\*" -Destination $HOOKS_TARGET -Recurse -Force
 
 Write-Host "  Configuring hooks.json..." -ForegroundColor Yellow
 if (Test-Path "hooks.json") {
-    $HooksJsonRaw = Get-Content -Raw -Path "hooks.json"
+    $HooksJsonRaw = Get-Content -Raw -Encoding UTF8 -Path "hooks.json"
     
     # Generate the absolute path to run-hook.cmd with forward slashes
     $AbsHookCmd = "$HOOKS_TARGET\run-hook.cmd" -replace '\\', '/'
@@ -84,23 +86,14 @@ if (Test-Path "hooks.json") {
     # Replace relative command "./hooks/run-hook.cmd" with absolute path
     $HooksJsonUpdated = $HooksJsonRaw -replace '\./hooks/run-hook.cmd', $AbsHookCmd
     
-    [System.IO.File]::WriteAllText($HOOKS_JSON_TARGET, $HooksJsonUpdated)
+    [System.IO.File]::WriteAllText($HOOKS_JSON_TARGET, $HooksJsonUpdated, [System.Text.Encoding]::UTF8)
     Write-Host "  Hooks configured successfully with absolute path: $AbsHookCmd" -ForegroundColor Green
 } else {
     Write-Warning "hooks.json not found in repository."
 }
 
-# 5. Deploy MCP Configuration
-Write-Host "[5/6] Deploying mcp_config.json..." -ForegroundColor Yellow
-if (Test-Path "mcp_config.json") {
-    Copy-Item -Path "mcp_config.json" -Destination $MCP_CONFIG_TARGET -Force
-    Write-Host "  MCP Configuration deployed successfully." -ForegroundColor Green
-} else {
-    Write-Warning "mcp_config.json not found in repository."
-}
-
-# 6. Cleanup Obsolete Plugins Directory
-Write-Host "[6/6] Cleaning up obsolete custom plugins directory..." -ForegroundColor Yellow
+# 5. Cleanup Obsolete Plugins Directory
+Write-Host "[5/6] Cleaning up obsolete custom plugins directory..." -ForegroundColor Yellow
 $PluginsPath = "$CONFIG_ROOT\plugins"
 if (Test-Path $PluginsPath) {
     Remove-Item -Path $PluginsPath -Recurse -Force
@@ -108,6 +101,15 @@ if (Test-Path $PluginsPath) {
 } else {
     Write-Host "  No obsolete plugins folder found. Skipping." -ForegroundColor DarkGreen
 }
+
+# 6. Deploy Custom Agents
+Write-Host "[6/6] Deploying custom agents to $CONFIG_ROOT\agents..." -ForegroundColor Yellow
+$null = New-Item -ItemType Directory -Force -Path "$CONFIG_ROOT\agents"
+if (Test-Path "$CONFIG_ROOT\agents\*") {
+    Remove-Item -Path "$CONFIG_ROOT\agents\*" -Recurse -Force -ErrorAction SilentlyContinue
+}
+Copy-Item -Path "agents\*" -Destination "$CONFIG_ROOT\agents" -Recurse -Force
+Write-Host "  Agents synced successfully." -ForegroundColor Green
 
 Write-Host "=========================================" -ForegroundColor Cyan
 Write-Host "Deployment completed successfully!" -ForegroundColor Cyan
